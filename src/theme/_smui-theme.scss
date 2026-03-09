@@ -23,3 +23,9 @@ a {
 a:visited {
   color: color.scale(#40b3ff, $lightness: -35%);
 }
+
+html, body {
+  background-color: theme.$background; /* or #000 in dark mode */
+  color: theme.$on-surface;
+  font-family: Roboto, sans-serif; /* Add this line! */
+}
