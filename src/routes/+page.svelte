@@ -7,7 +7,6 @@
 	// let snackbarWithClose: Snackbar;
 	// let snackbarWithoutClose: Snackbar;
 	import Button, { Label, Icon } from '@smui/button';
-	import Textfield from '@smui/textfield';
 	// import Dialog, { Title, Content, Actions } from '@smui/dialog';
 	import Dialog, { Header, Title, Content, Actions } from '@smui/dialog';
 	import DataTable, { Head, Body, Row, Cell } from '@smui/data-table';
@@ -16,30 +15,27 @@
 
 	import Paper from '@smui/paper';
 	import Fab from '@smui/fab';
+	import IconButton from '@smui/icon-button';
+
+	import { buildQuery, formatDate } from '$lib/utils.js';
+
+	let { data } = $props();
+	let { item_values } = data;
 
 	let searchQuery = $state('');
 	let filterDialogOpen = $state(false);
 	let downloadDialogOpen = $state(false);
 
-	let categories = $state(['Productivity', 'Audio & Video']);
 	let value = $state('');
+	let apiParams = $state(data.apiParams);
 
-	const categoryList = [
-		'Productivity',
-		'Graphics & Photography',
-		'Audio & Video',
-		'Education',
-		'Games',
-		'Networking',
-		'Developer Tools',
-		'Science',
-		'System',
-		'Utilities'
-	];
+	let tags = $state([]);
+	let models = $state([]);
+	let sites = $state([]);
 
-  let tags = $state([]);
-  const tagList: string[] = [];
-
+	const tagList = item_values.tags;
+	const modelList = item_values.performers;
+	const siteList = item_values.networks;
 
 	function doSearch() {
 		alert('Search for ' + value);
@@ -51,77 +47,44 @@
 		}
 	}
 
-	let infos = null;
-
-	let query_params = { tags: [], performers: [], network: null };
-
-	async function fetchData() {
-		const res = await fetch('http://127.0.0.1:8000/api/items/');
-		if (res.ok) {
-			infos = await res.json();
-			infos.tags.array.forEach(element => {
-        tagList.push(element);
-      });
-		} else {
-			throw new Error('Failed to fetch data');
-		}
-	}
-
-  await fetchData();
-
 	async function fetchVideosAll() {
-		const res = await fetch('http://127.0.0.1:8000/api/videos/');
+		const query = buildQuery(apiParams);
+		const url = `http://127.0.0.1:8000/api/videos/?${query}`;
+		const res = await fetch(url);
 		if (res.ok) {
 			return await res.json();
 		} else {
 			throw new Error('Failed to fetch data');
 		}
 	}
+
+	$effect(() => {
+		apiParams.tag = tags;
+		apiParams.performer = models;
+	});
 </script>
 
 <svelte:head>
 	<title>Home - SuperApp</title>
 </svelte:head>
 
-<!-- <div class="hero">
-  <h1 class="mdc-typography--headline3">Welcome to SuperApp</h1>
-  <p class="mdc-typography--body1">Your trusted source for premium Ayurvedic medicines and natural herbs.</p>
-</div> -->
-
-<!-- <div class="card-container">
-  <Card>
-    <PrimaryAction>
-      <Content>
-        <Title>Organic Ashwagandha</Title>
-        <Subtitle>Stress Relief & Vitality</Subtitle>
-        <p class="mdc-typography--body2">Pure root extract powder for daily wellness.</p>
-      </Content>
-    </PrimaryAction>
-  </Card>
-
-  <Card>
-    <PrimaryAction>
-      <Content>
-        <Title>Triphala Churna</Title>
-        <Subtitle>Digestive Health</Subtitle>
-        <p class="mdc-typography--body2">Traditional herbal blend for natural detox.</p>
-      </Content>
-    </PrimaryAction>
-  </Card>
-  <Button onclick={() => snackbarWithClose.open()}>
-  <br>
-  <Label>Open Snackbar With Dismiss</Label>
-</Button>
-</div> -->
-{#await fetchVideosAll()}
-	<CircularProgress style="height: 32px; width: 32px;" indeterminate />
-{:then videos}
-	<div class="dashboard-container">
+<div class="dashboard-container">
+	{#if item_values}
 		<div class="action-bar">
 			<div class="search-wrapper">
 				<Paper class="solo-search-paper" elevation={1}>
 					<Icon class="material-icons search-icon">search</Icon>
-					<input type="text" bind:value={searchQuery} placeholder="Search" class="solo-input" />
+					<input type="text" bind:value={apiParams.search} placeholder="Search" class="solo-input" />
+
+					{#if apiParams.search.length > 0}
+						<IconButton
+							class="material-icons clear-button"
+							onclick={() => (apiParams.search = '')}
+							aria-label="Clear search"
+						>
+							close
+						</IconButton>
+					{/if}
 				</Paper>
 
 				<Fab color="primary" mini class="search-fab">
@@ -139,6 +102,11 @@
 				<Label>Download</Label>
 			</Button>
 		</div>
+	{/if}
+	{#await fetchVideosAll()}
+		<CircularProgress style="height: 32px; width: 32px;" indeterminate />
+	{:then videos}
+		<pre>{JSON.stringify(apiParams)}</pre>
 		<div class="table-container">
 			<DataTable style="width: 100%;">
 				<Head>
@@ -146,48 +114,74 @@
 						<Cell>Title</Cell>
 						<Cell>URL</Cell>
 						<Cell>Network</Cell>
+						<Cell>Models Count</Cell>
+						<Cell>Tags Count</Cell>
+						<Cell>Created At</Cell>
 					</Row>
 				</Head>
 				<Body>
-					{#each videos.results as row}
+					{#each videos.results as row (row.id)}
 						<Row>
 							<Cell>{row.title}</Cell>
 							<Cell>{row.url}</Cell>
 							<Cell>{row.network_name}</Cell>
+							<Cell>{row.performer_names.length}</Cell>
+							<Cell>{row.tag_names.length}</Cell>
+							<Cell>{formatDate(row.created_at)}</Cell>
 						</Row>
 					{/each}
 				</Body>
 			</DataTable>
 		</div>
-	</div>
-{:catch error}
-	<p>{error}</p>
-{/await}
+	{:catch error}
+		<p>{error}</p>
+	{/await}
+</div>
 
-<Dialog bind:open={filterDialogOpen} aria-labelledby="filter-title">
+<Dialog bind:open={filterDialogOpen} aria-labelledby="filter-title" class="responsive-dialog">
 	<Title id="filter-title">Filter Content</Title>
-	<Content>
+	<Content id="filter-content">
 		<div class="filter-form">
 			<ChipInput
-				bind:chips={categories}
+				bind:chips={tags}
 				bind:value
 				chipTrailingAction$class="material-icons"
 				chipTrailingAction$aria-label="Remove category"
-				autocomplete$options={categoryList.filter(
-					(category) => !categories.find((cat) => cat === category)
+				autocomplete$options={tagList.filter((category) => !tags.find((cat) => cat === category))}
+				autocomplete$showMenuWithNoInput
+			>
+				{#snippet chipTrailingAction()}cancel{/snippet}
+				{#snippet label()}Tags{/snippet}
+			</ChipInput>
+			<ChipInput
+				bind:chips={models}
+				bind:value
+				chipTrailingAction$class="material-icons"
+				chipTrailingAction$aria-label="Remove category"
+				autocomplete$options={modelList.filter(
+					(category) => !models.find((cat) => cat === category)
 				)}
 				autocomplete$showMenuWithNoInput
 			>
 				{#snippet chipTrailingAction()}cancel{/snippet}
-				{#snippet label()}
-					Categories
-				{/snippet}
+				{#snippet label()}Models{/snippet}
+			</ChipInput>
+			<ChipInput
+				bind:chips={sites}
+				bind:value
+				chipTrailingAction$class="material-icons"
+				chipTrailingAction$aria-label="Remove category"
+				autocomplete$options={siteList.filter((category) => !sites.find((cat) => cat === category))}
+				autocomplete$showMenuWithNoInput
+			>
+				{#snippet chipTrailingAction()}cancel{/snippet}
+				{#snippet label()}Sites{/snippet}
 			</ChipInput>
 		</div>
 	</Content>
 </Dialog>
 
-<Dialog
+<!-- <Dialog
 	bind:open={filterDialogOpen}
 	fullscreen
 	aria-labelledby="filter-title"
@@ -202,9 +196,7 @@
 			bind:value
 			chipTrailingAction$class="material-icons"
 			chipTrailingAction$aria-label="Remove category"
-			autocomplete$options={tagList.filter(
-				(category) => !tags.find((cat) => cat === category)
-			)}
+			autocomplete$options={tagList.filter((category) => !tags.find((cat) => cat === category))}
 			autocomplete$showMenuWithNoInput
 		>
 			{#snippet chipTrailingAction()}cancel{/snippet}
@@ -221,7 +213,7 @@
 			<Label>Accept</Label>
 		</Button>
 	</Actions>
-</Dialog>
+</Dialog> -->
 
 <Dialog bind:open={downloadDialogOpen} aria-labelledby="download-title">
 	<Title id="download-title">Download Data</Title>
@@ -250,47 +242,69 @@
 	}
 
 	/* --- NEW Wrapper Styles --- */
-  .search-wrapper {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem; /* Space between search and FAB */
-    width: 100%;
-    max-width: 700px; /* Keeps it from getting too wide on desktop */
-  }
+	.search-wrapper {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem; /* Space between search and FAB */
+		width: 100%;
+		max-width: 700px; /* Keeps it from getting too wide on desktop */
+	}
 
-  /* --- UPDATED Solo Search Styles --- */
-  :global(.solo-search-paper) {
-    display: flex;
-    align-items: center;
-    flex-grow: 1; /* Tells the search bar to take up remaining space next to the FAB */
-    height: 48px;
-    padding: 0 16px;
-    /* Removed: width: 100% and margin-right */
-  }
+	:global(.responsive-dialog .mdc-dialog__surface) {
+		width: 90vw !important; /* Takes up 90% of the screen width on mobile */
+		max-width: 800px !important; /* Stops growing at 800px on desktop monitors */
+		min-height: 50vh; /* Guarantees the dialog is at least half the screen height */
+		max-height: 90vh; /* Prevents the dialog from overflowing the screen */
+	}
 
-  :global(.search-icon) {
-    margin-right: 12px;
-    color: var(--mdc-theme-text-secondary-on-background, #888); 
-  }
+	/* Make sure the form inside stretches to use the new space */
+	.filter-form {
+		display: flex;
+		flex-direction: column;
+		padding-top: 1rem;
+		min-height: 300px; /* Gives the ChipInput dropdown menu plenty of room to open */
+	}
 
-  .solo-input {
-    border: none;
-    background: transparent;
-    outline: none;
-    flex-grow: 1;
-    font-family: inherit;
-    font-size: 1rem;
-    color: inherit;
-    width: 100%; /* Ensures the input stretches inside the Paper */
-  }
+	/* --- UPDATED Solo Search Styles --- */
+	:global(.solo-search-paper) {
+		display: flex;
+		align-items: center;
+		flex-grow: 1; /* Tells the search bar to take up remaining space next to the FAB */
+		height: 48px;
+		padding: 0 16px;
+		/* Removed: width: 100% and margin-right */
+	}
 
-  /* Keep this as it is */
-  .action-bar {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 0.5rem;
-    margin-bottom: 2rem;
-    flex-wrap: wrap;
-  }
+	:global(.search-icon) {
+		margin-right: 12px;
+		color: var(--mdc-theme-text-secondary-on-background, #888);
+	}
+
+	.solo-input {
+		border: none;
+		background: transparent;
+		outline: none;
+		flex-grow: 1;
+		font-family: inherit;
+		font-size: 1rem;
+		color: inherit;
+		width: 100%; /* Ensures the input stretches inside the Paper */
+	}
+
+	/* Keep this as it is */
+	.action-bar {
+		display: flex;
+		justify-content: center;
+		align-items: center;
+		gap: 0.5rem;
+		margin-bottom: 2rem;
+		flex-wrap: wrap;
+	}
+
+	:global(.clear-button) {
+		margin-left: 4px;
+		margin-right: -8px; /* Pulls the icon slightly closer to the right edge */
+		color: var(--mdc-theme-text-secondary-on-background, #888) !important;
+		padding: 8px !important; /* Reduces the touch target size slightly to fit the Paper height */
+	}
 </style>
