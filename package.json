@@ -32,6 +32,7 @@
 		"@smui/icon-button": "^8.0.3",
 		"@smui/list": "^8.0.3",
 		"@smui/paper": "^8.0.3",
+		"@smui/select": "^8.0.3",
 		"@smui/snackbar": "^8.0.3",
 		"@smui/textfield": "^8.0.3",
 		"@smui/top-app-bar": "^8.0.3",

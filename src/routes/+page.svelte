@@ -12,17 +12,19 @@
 	import DataTable, { Head, Body, Row, Cell } from '@smui/data-table';
 	import CircularProgress from '@smui/circular-progress';
 	import ChipInput from '@smui-extra/chip-input';
+	import Select, { Option } from '@smui/select';
 
 	import Paper from '@smui/paper';
 	import Fab from '@smui/fab';
 	import IconButton from '@smui/icon-button';
 
 	import { buildQuery, formatDate } from '$lib/utils.js';
+	import { sortOptions } from '$lib/stores';
 
 	let { data } = $props();
 	let { item_values } = data;
 
-	let searchQuery = $state('');
+	// let searchQuery = $state('');
 	let filterDialogOpen = $state(false);
 	let downloadDialogOpen = $state(false);
 
@@ -36,6 +38,8 @@
 	const tagList = item_values.tags;
 	const modelList = item_values.performers;
 	const siteList = item_values.networks;
+
+	const sort = $state(apiParams.sort);
 
 	function doSearch() {
 		alert('Search for ' + value);
@@ -58,6 +62,15 @@
 		}
 	}
 
+	function reset() {
+		apiParams.network = [];
+		apiParams.performer = [];
+		apiParams.tag = [];
+		apiParams.search = '';
+		apiParams.ordering = '-created_at';
+		apiParams.page = 1;
+	}
+
 	$effect(() => {
 		apiParams.tag = tags;
 		apiParams.performer = models;
@@ -70,37 +83,61 @@
 
 <div class="dashboard-container">
 	{#if item_values}
-		<div class="action-bar">
-			<div class="search-wrapper">
-				<Paper class="solo-search-paper" elevation={1}>
-					<Icon class="material-icons search-icon">search</Icon>
-					<input type="text" bind:value={apiParams.search} placeholder="Search" class="solo-input" />
+		<div class="controls-container">
+			<div class="action-bar">
+				<div class="search-wrapper">
+					<Paper class="solo-search-paper" elevation={1}>
+						<Icon class="material-icons search-icon">search</Icon>
+						<input
+							type="text"
+							bind:value={apiParams.search}
+							placeholder="Search"
+							class="solo-input"
+						/>
 
-					{#if apiParams.search.length > 0}
-						<IconButton
-							class="material-icons clear-button"
-							onclick={() => (apiParams.search = '')}
-							aria-label="Clear search"
-						>
-							close
-						</IconButton>
-					{/if}
-				</Paper>
+						{#if apiParams.search.length > 0}
+							<IconButton
+								class="material-icons clear-button"
+								onclick={() => (apiParams.search = '')}
+								aria-label="Clear search"
+							>
+								close
+							</IconButton>
+						{/if}
+					</Paper>
 
-				<Fab color="primary" mini class="search-fab">
-					<Icon class="material-icons">arrow_forward</Icon>
-				</Fab>
+					<Fab color="primary" mini class="search-fab">
+						<Icon class="material-icons">arrow_forward</Icon>
+					</Fab>
+					<Fab color="primary" mini onclick={() => (downloadDialogOpen = true)}>
+						<Icon class="material-icons">download</Icon>
+					</Fab>
+				</div>
+
+				<Button variant="unelevated" onclick={() => (filterDialogOpen = true)}>
+					<Icon class="material-icons">filter_list</Icon>
+					<Label>Filter</Label>
+				</Button>
+
+				<Button variant="outlined" onclick={reset}>
+					<Icon class="material-icons">refresh</Icon>
+					<Label>Reset</Label>
+				</Button>
+
 			</div>
 
-			<Button variant="unelevated" onclick={() => (filterDialogOpen = true)}>
-				<Icon class="material-icons">filter_list</Icon>
-				<Label>Filter</Label>
-			</Button>
-
-			<Button variant="outlined" onclick={() => (downloadDialogOpen = true)}>
-				<Icon class="material-icons">download</Icon>
-				<Label>Download</Label>
-			</Button>
+			<div class="sort-bar">
+				<Select
+					variant="outlined"
+					bind:value={apiParams.ordering}
+					label="Sort By"
+					style="width: 100%; max-width: 350px;"
+				>
+					{#each Object.entries(sortOptions) as [key, value] (key)}
+						<Option value={key}>{value}</Option>
+					{/each}
+				</Select>
+			</div>
 		</div>
 	{/if}
 	{#await fetchVideosAll()}
@@ -292,14 +329,34 @@
 	}
 
 	/* Keep this as it is */
+	/* --- NEW: Controls Container --- */
+	.controls-container {
+		display: flex;
+		flex-direction: column;
+		gap: 1rem; /* Space between the top row and the Select dropdown */
+		margin-bottom: 2rem;
+		align-items: center;
+	}
+
+	/* Your existing action bar, untouched */
 	.action-bar {
 		display: flex;
 		justify-content: center;
 		align-items: center;
 		gap: 0.5rem;
-		margin-bottom: 2rem;
 		flex-wrap: wrap;
+		width: 100%;
 	}
+
+	/* --- NEW: Sort Bar --- */
+	.sort-bar {
+		display: flex;
+		width: 100%;
+		/* justify-content: flex-start;  <-- Uncomment this if you want it aligned strictly to the left edge of the search bar instead of centered */
+		justify-content: center;
+	}
+
+	/* Keep your existing .search-wrapper and .solo-search-paper styles here */
 
 	:global(.clear-button) {
 		margin-left: 4px;

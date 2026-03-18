@@ -1,3 +1,6 @@
+import { error } from '@sveltejs/kit';
+import {sortOptions} from '$lib/stores.js'
+
 export async function load({url}) {
     const res = await fetch('http://127.0.0.1:8000/api/items/');
     const item_values = await res.json()
@@ -7,25 +10,44 @@ export async function load({url}) {
         tags: [],
         models: [], 
         networks: [], 
+        sort: '',
     }
 
     
     url.searchParams.getAll('tags').forEach(element => {
+        if (!item_values.tags.includes(element)){
+            throw error(404, 'Invalid Tag. Please Visit Home.');
+        }
         states.tags.push(element)
         
     });
     url.searchParams.getAll('models').forEach(element => {
-        states.tags.push(element)
+        if (!item_values.performers.includes(element)){
+            throw error(404, 'Item not found');
+        }
+        states.models.push(element)
     });
     url.searchParams.getAll('networks').forEach(element => {
-        states.tags.push(element)
+        if (!item_values.networks.includes(element)){
+            throw error(404, 'Item not found');
+        }
+        states.networks.push(element)
     });
+
+    if ('sort' in queries){
+        if (!Object.keys(sortOptions).includes(queries.sort)){
+            throw error(404)
+        }
+        states.sort = queries.sort;
+    }
+
     
     let apiParams = {
         tag:states.tags,
         performer: states.models,
-        search:'',
+        search: queries.search || '',
         network:states.networks,
+        ordering: queries.sort || '-created_at',
         page: queries.page || 1
     }
     
