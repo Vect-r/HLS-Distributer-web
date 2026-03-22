@@ -1,8 +1,10 @@
 import { error } from '@sveltejs/kit';
 import {sortOptions} from '$lib/stores.js'
+import { baseUrl } from '$lib/stores.js';
 
 export async function load({url}) {
-    const res = await fetch('http://127.0.0.1:8000/api/items/');
+    // const res = await fetch('http://127.0.0.1:8000/api/items/');
+    const res = await fetch(`${baseUrl}/api/items/`);
     const item_values = await res.json()
 
     const queries = Object.fromEntries(url.searchParams)
@@ -43,12 +45,13 @@ export async function load({url}) {
 
     
     let apiParams = {
+        search: queries.search || '',
         tag:states.tags,
         performer: states.models,
-        search: queries.search || '',
         network:states.networks,
         ordering: queries.sort || '-created_at',
-        page: queries.page || 1
+        // page: queries.page || 1
+        offset: 0
     }
     
     

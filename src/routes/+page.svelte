@@ -17,12 +17,17 @@
 	import Paper from '@smui/paper';
 	import Fab from '@smui/fab';
 	import IconButton from '@smui/icon-button';
+	import Badge from '@smui-extra/badge';
+	
+	import Pagination from '$lib/components/Pagination.svelte';
 
 	import { buildQuery, formatDate } from '$lib/utils.js';
-	import { sortOptions } from '$lib/stores';
+	import { sortOptions, baseUrl } from '$lib/stores';
+	import { authFetch } from '$lib/api';
 
 	let { data } = $props();
 	let { item_values } = data;
+
 
 	// let searchQuery = $state('');
 	let filterDialogOpen = $state(false);
@@ -41,6 +46,17 @@
 
 	const sort = $state(apiParams.sort);
 
+	const qualities = item_values.qualities;
+	let quality = $state('');
+
+	const codecs = item_values.codecs;
+	let codec = $state('');
+
+	// console.log('HLS Download: ',quality,codec)
+	console.log('HLS Download: ', !quality || !codec);
+
+	let downloadLink = $state('');
+
 	function doSearch() {
 		alert('Search for ' + value);
 	}
@@ -53,8 +69,8 @@
 
 	async function fetchVideosAll() {
 		const query = buildQuery(apiParams);
-		const url = `http://127.0.0.1:8000/api/videos/?${query}`;
-		const res = await fetch(url);
+		const url = `/api/videos/?${query}`;
+		const res = await authFetch(url);
 		if (res.ok) {
 			return await res.json();
 		} else {
@@ -63,18 +79,49 @@
 	}
 
 	function reset() {
-		apiParams.network = [];
-		apiParams.performer = [];
-		apiParams.tag = [];
+		// apiParams.network = [];
+		// apiParams.performer = [];
+		// apiParams.tag = [];
+		sites = [];
+		models = [];
+		tags = [];
+
 		apiParams.search = '';
 		apiParams.ordering = '-created_at';
-		apiParams.page = 1;
+		apiParams.offset = 0;
 	}
 
 	$effect(() => {
 		apiParams.tag = tags;
 		apiParams.performer = models;
+		apiParams.network = sites;
 	});
+
+	function toggleSort(columnName) {
+		if (apiParams.ordering === columnName) {
+			// If currently ascending, switch to descending
+			apiParams.ordering = `-${columnName}`;
+		} else if (apiParams.ordering === `-${columnName}`) {
+			// If currently descending, clear the sort (reset)
+			apiParams.ordering = '-created_at';
+		} else {
+			// Otherwise, set to ascending
+			apiParams.ordering = columnName;
+		}
+	}
+
+	function downloadHLS() {
+		const ObjQuery = Object.assign({}, apiParams, {
+			download: true,
+			quality: quality,
+			codec: codec
+		});
+		const query = buildQuery(ObjQuery);
+		const url = `${baseUrl}/api/videos/?${query}`;
+		// return url;
+		window.open(url, '_blank');
+		downloadDialogOpen = false;
+	}
 </script>
 
 <svelte:head>
@@ -123,7 +170,6 @@
 					<Icon class="material-icons">refresh</Icon>
 					<Label>Reset</Label>
 				</Button>
-
 			</div>
 
 			<div class="sort-bar">
@@ -140,20 +186,58 @@
 			</div>
 		</div>
 	{/if}
-	{#await fetchVideosAll()}
-		<CircularProgress style="height: 32px; width: 32px;" indeterminate />
-	{:then videos}
-		<pre>{JSON.stringify(apiParams)}</pre>
-		<div class="table-container">
+	<div class="table-container">
+		{#await fetchVideosAll()}
+			<CircularProgress style="height: 32px; width: 32px;" indeterminate />
+		{:then videos}
+			<pre>DEBUG apiParams: {JSON.stringify(apiParams)}</pre>
+			<!-- <h1>
+			VR Videos
+			<Badge aria-label="unread count">{videos.count}</Badge>
+		</h1> -->
+			<div class="table-header">
+				<div class="title-wrapper">
+					<h1 class="table-title">Videos</h1>
+					<Badge color="primary" position="middle" align="top-end">
+						{videos.total}
+					</Badge>
+				</div>
+			</div>
+			{#snippet sortIcon(col)}
+				{#if apiParams.ordering === col}
+					<Icon class="material-icons sort-indicator">arrow_upward</Icon>
+				{:else if apiParams.ordering === `-${col}`}
+					<Icon class="material-icons sort-indicator">arrow_downward</Icon>
+				{:else}
+					<Icon class="material-icons sort-indicator placeholder">arrow_upward</Icon>
+				{/if}
+			{/snippet}
 			<DataTable style="width: 100%;">
 				<Head>
 					<Row>
-						<Cell>Title</Cell>
+						<Cell class="sortable-header" onclick={() => toggleSort('title')}>
+							<div class="header-content">
+								Title
+								{@render sortIcon('title')}
+							</div>
+						</Cell>
 						<Cell>URL</Cell>
-						<Cell>Network</Cell>
+						<!-- <Cell>Network</Cell> -->
+						<Cell class="sortable-header" onclick={() => toggleSort('network__name')}>
+							<div class="header-content">
+								Network
+								{@render sortIcon('network__name')}
+							</div>
+						</Cell>
 						<Cell>Models Count</Cell>
 						<Cell>Tags Count</Cell>
-						<Cell>Created At</Cell>
+						<!-- <Cell>Created At</Cell> -->
+						<Cell class="sortable-header" onclick={() => toggleSort('created_at')}>
+							<div class="header-content">
+								Date Added
+								{@render sortIcon('created_at')}
+							</div>
+						</Cell>
 					</Row>
 				</Head>
 				<Body>
@@ -166,16 +250,30 @@
 							<Cell>{row.tag_names.length}</Cell>
 							<Cell>{formatDate(row.created_at)}</Cell>
 						</Row>
+					{:else}
+						<Row>
+							<Cell colspan={6} class="empty-table-message">
+								<div class="empty-content">
+									<span class="material-icons">search_off</span>
+									<p>No videos found matching your search or filters.</p>
+								</div>
+							</Cell>
+						</Row>
 					{/each}
 				</Body>
 			</DataTable>
-		</div>
-	{:catch error}
-		<p>{error}</p>
-	{/await}
+			<Pagination total={videos.total} bind:offset={apiParams.offset} />
+		{:catch error}
+			<p>{error}</p>
+		{/await}
+	</div>
 </div>
 
-<Dialog bind:open={filterDialogOpen} aria-labelledby="filter-title" class="responsive-dialog">
+<Dialog
+	bind:open={filterDialogOpen}
+	aria-labelledby="filter-title"
+	class="responsive-dialog overflow-visible-dialog"
+>
 	<Title id="filter-title">Filter Content</Title>
 	<Content id="filter-content">
 		<div class="filter-form">
@@ -252,17 +350,42 @@
 	</Actions>
 </Dialog> -->
 
-<Dialog bind:open={downloadDialogOpen} aria-labelledby="download-title">
-	<Title id="download-title">Download Data</Title>
+<Dialog
+	bind:open={downloadDialogOpen}
+	aria-labelledby="download-title"
+	class="overflow-visible-dialog"
+>
+	<Title id="download-title">Download Options</Title>
 	<Content>
-		<p>Are you sure you want to export the current table view as a CSV file?</p>
+		<div class="download-form">
+			<p class="mdc-typography--body2 text-muted" style="margin-bottom: 1rem;">
+				Select your preferred format for the HLS stream export.
+			</p>
+
+			<Select
+				variant="outlined"
+				bind:value={quality}
+				label="Quality"
+				style="width: 100%; margin-bottom: 1.5rem;"
+			>
+				{#each qualities as q}
+					<Option value={q}>{q}</Option>
+				{/each}
+			</Select>
+
+			<Select variant="outlined" bind:value={codec} label="Codec" style="width: 100%;">
+				{#each codecs as c}
+					<Option value={c}>{c}</Option>
+				{/each}
+			</Select>
+		</div>
 	</Content>
 	<Actions>
 		<Button onclick={() => (downloadDialogOpen = false)}>
 			<Label>Cancel</Label>
 		</Button>
-		<Button onclick={() => (downloadDialogOpen = false)} variant="unelevated">
-			<Label>Confirm Download</Label>
+		<Button onclick={downloadHLS} variant="unelevated" disabled={!quality || !codec}>
+			<Label>Download</Label>
 		</Button>
 	</Actions>
 </Dialog>
@@ -276,6 +399,91 @@
 		display: grid;
 		grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
 		gap: 1.5rem;
+	}
+
+	.table-header {
+		display: flex;
+		align-items: center;
+		margin-bottom: 1rem;
+		padding-left: 0.5rem;
+	}
+
+	.table-title {
+		margin: 0;
+		font-weight: 500;
+	}
+
+	/* NEW: Anchor for the SMUI Badge */
+	.title-wrapper {
+		position: relative;
+		display: inline-block;
+		padding-right: 1.5rem; /* Ensures the badge doesn't get cut off if it's pushed to the 'outset' edge */
+	}
+
+	/* --- Download Form Styles --- */
+	.download-form {
+		display: flex;
+		flex-direction: column;
+		padding-top: 0.5rem;
+		min-width: 300px;
+		min-height: 250px; /* Gives the Select menus enough room to drop down without clipping */
+	}
+
+	:global(.overflow-visible-dialog .mdc-dialog__content) {
+		overflow: visible !important;
+	}
+
+	/* 2. Allows the main surface of the dialog to let elements float outside of it */
+	:global(.overflow-visible-dialog .mdc-dialog__surface) {
+		overflow: visible !important;
+	}
+
+	/* 3. Ensure the dropdown menus themselves pop to the very front */
+	:global(.mdc-select__menu) {
+		z-index: 10 !important;
+	}
+
+	:global(.empty-table-message) {
+		text-align: center;
+		padding: 3rem 1rem !important;
+	}
+
+	.empty-content {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 0.5rem;
+		color: var(--mdc-theme-text-secondary-on-background, #888);
+	}
+
+	.empty-content .material-icons {
+		font-size: 3rem;
+		opacity: 0.5;
+	}
+
+	:global(.sortable-header) {
+		cursor: pointer;
+		user-select: none; /* Prevents text from highlighting when rapidly clicking */
+		transition: background-color 0.2s ease;
+	}
+
+	:global(.sortable-header:hover) {
+		background-color: rgba(128, 128, 128, 0.1); /* Subtle hover effect */
+	}
+
+	.header-content {
+		display: flex;
+		align-items: center;
+		gap: 4px; /* Space between text and icon */
+	}
+
+	:global(.sort-indicator) {
+		font-size: 1.1rem !important; /* Slightly smaller than default icons */
+		color: var(--mdc-theme-primary, #ff3e00) !important;
+	}
+
+	:global(.sort-indicator.placeholder) {
+		opacity: 0; /* Keeps the spacing consistent, but invisible */
 	}
 
 	/* --- NEW Wrapper Styles --- */
