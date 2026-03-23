@@ -190,7 +190,7 @@
 		{#await fetchVideosAll()}
 			<CircularProgress style="height: 32px; width: 32px;" indeterminate />
 		{:then videos}
-			<pre>DEBUG apiParams: {JSON.stringify(apiParams)}</pre>
+			<!-- <pre>DEBUG apiParams: {JSON.stringify(apiParams)}</pre> -->
 			<!-- <h1>
 			VR Videos
 			<Badge aria-label="unread count">{videos.count}</Badge>

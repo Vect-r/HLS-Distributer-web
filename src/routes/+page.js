@@ -1,10 +1,11 @@
 import { error } from '@sveltejs/kit';
 import {sortOptions} from '$lib/stores.js'
 import { baseUrl } from '$lib/stores.js';
+import { authFetch } from '../lib/api.js';
 
 export async function load({url}) {
     // const res = await fetch('http://127.0.0.1:8000/api/items/');
-    const res = await fetch(`${baseUrl}/api/items/`);
+    const res = await authFetch('/api/items/');
     const item_values = await res.json()
 
     const queries = Object.fromEntries(url.searchParams)
@@ -59,3 +60,6 @@ export async function load({url}) {
 
     return {item_values,apiParams}
 }
+
+export const ssr = false;
+export const csr = true;
